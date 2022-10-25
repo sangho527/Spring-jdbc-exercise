@@ -1,69 +1,55 @@
 package com.dao;
 
-import com.connection.ConnectionMaker;
 import com.domain.User;
-import com.sun.jdi.connect.spi.Connection;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.List;
 import java.util.Map;
 
 public class UserDao {
+    private JdbcTemplate jdbcTemplate;
 
-    private ConnectionMaker connectionMaker;
-
-    public UserDao(ConnectionMaker connectionMaker) {
-        this.connectionMaker = connectionMaker;
+    public UserDao(DataSource dataSource) {
+        this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
-    public void add(User user) {
-        Map<String, String> env = System.getenv();
-        try {
-            // DB접속 (ex sql workbeanch실행)
-            Connection c = connectionMaker.makeConnection();
+    public void add(User user){
+        this.jdbcTemplate.update("insert into users (id, name, pasword) values (?,?,?);",
+                user.getId(), user.getName(), user.getPassword());
+    }
 
-            // Query문 작성
-            PreparedStatement pstmt = c.prepareStatement("INSERT INTO users(id, name, password) VALUES(?,?,?);");
-            pstmt.setString(1, user.getId());
-            pstmt.setString(2, user.getName());
-            pstmt.setString(3, user.getPassword());
+    public void deleteAll(){
+        this.jdbcTemplate.update("delete from users");
+    }
 
-            // Query문 실행
-            pstmt.executeUpdate();
-
-            pstmt.close();
-            c.close();
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+    public int getCount(){
+        return this.jdbcTemplate.queryForObject("select count)*)from users;",Integer.class);
     }
 
     public User findById(String id) {
-        Map<String, String> env = System.getenv();
-        Connection c;
-        try {
-            // DB접속 (ex sql workbeanch실행)
-            c = connectionMaker.makeConnection();
-
-            // Query문 작성
-            PreparedStatement pstmt = c.prepareStatement("SELECT * FROM users WHERE id = ?");
-            pstmt.setString(1, id);
-
-            // Query문 실행
-            ResultSet rs = pstmt.executeQuery();
-            rs.next();
-            User user = new User(rs.getString("id"), rs.getString("name"),
-                    rs.getString("password"));
-
-            rs.close();
-            pstmt.close();
-            c.close();
-
-            return user;
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        String sql = "select *from users where id = ?";
+        RowMapper<User> rowMapper = new RowMapper<User>() {
+            @Override
+            public User mapRow(ResultSet rs, int rowNum) throws SQLException {
+                User user = new User(rs.getString("id"), rs.getString("name"), rs.getString("password"));
+                return user;
+            }
+        };
+        return this.jdbcTemplate.queryForObject(sql, rowMapper, id);
     }
 
+    public List<User> getAll(){
+        String sql = "select *from users order by id";
+        RowMapper<User> rowMapper = new RowMapper<User>() {
+            @Override
+            public User mapRow(ResultSet rs, int rowNum) throws SQLException {
+                User user = new User(rs.getString("id"),rs.getString("name"),rs.getString("password"));
+                return user;
+            }
+        };
+        return this.jdbcTemplate.query(sql, rowMapper);
+    }
 }
-
